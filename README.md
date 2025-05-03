@@ -1,1 +1,9 @@
-# stormcraft
+# Stormcraft
+Project:
+Create a framework to deploy and configure A Minecraft cluster for the kids.
+
+Todo list:
+- Identify Hosting requirements
+- Java or Bedrock?
+- [Shulker operator to deploy minecraft?](https://github.com/jeremylvln/Shulker)
+- [Agones](https://agones.dev/site/)?
