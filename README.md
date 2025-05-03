@@ -9,3 +9,4 @@ Todo list:
 - Java or Bedrock?
 - [Shulker operator to deploy minecraft?](https://github.com/jeremylvln/Shulker)
 - [Agones](https://agones.dev/site/)?
+- [Geyser Bedrock clients to Java server](https://geysermc.org/)
