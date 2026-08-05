@@ -1,0 +1,43 @@
+# helm install cilium cilium/cilium --version 1.18.0 --namespace kube-system -f cilium/values.yaml
+#
+# Talos requirements for a CNI running as the sole network provider with
+# kube-proxy replaced (see talos/patches/cni-kubeproxy.yaml, which must be
+# applied before this chart is installed):
+#   - k8sServiceHost/k8sServicePort point at KubePrism (127.0.0.1:7445),
+#     which every Talos node exposes locally so Cilium can reach the API
+#     server without an external load balancer.
+#   - cgroup.autoMount is disabled because Talos already mounts the unified
+#     cgroupv2 hierarchy at /sys/fs/cgroup.
+#   - Talos does not allow workloads to load kernel modules, so SYS_MODULE
+#     is dropped from Cilium's default capability set.
+ipam:
+  mode: kubernetes
+
+kubeProxyReplacement: true
+
+k8sServiceHost: localhost
+k8sServicePort: 7445
+
+cgroup:
+  autoMount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE

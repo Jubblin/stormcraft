@@ -1,0 +1,20 @@
+# Controlplane-only patch (--config-patch-control-plane).
+#
+# Nodes get their real address from DHCP, but with 3 control planes the
+# cluster still needs one stable address for the Kubernetes/Talos API
+# endpoint. Talos can float a virtual IP across the control plane nodes
+# itself, so no external load balancer is required.
+#
+# Before applying:
+#   - Reserve <VIP_IP> in the DHCP server (or otherwise keep it out of the
+#     lease pool) so nothing else can claim it.
+#   - Replace <IFACE> with the node's real NIC name. This isn't known until
+#     first boot — check with `talosctl get links --insecure -n <node-ip>`
+#     (usually eth0 for a Proxmox virtio NIC).
+machine:
+  network:
+    interfaces:
+      - interface: <IFACE>
+        dhcp: true
+        vip:
+          ip: <VIP_IP>
