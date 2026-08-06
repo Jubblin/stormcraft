@@ -1,0 +1,15 @@
+# kubectl apply -k cilium/
+#
+# Lives here (not in bootstrap-job/) because Kustomize's default load
+# restrictor won't read a file from outside the kustomization root, and
+# this generates the cilium-values ConfigMap straight from values.yaml so
+# there's one source of truth for the Helm values (the same file
+# talos/README.md's manual `helm install` fallback uses).
+namespace: kube-system
+resources:
+  - bootstrap-job/serviceaccount.yaml
+  - bootstrap-job/job.yaml
+configMapGenerator:
+  - name: cilium-values
+    files:
+      - values.yaml

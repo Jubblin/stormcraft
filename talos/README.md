@@ -57,14 +57,35 @@ talosctl kubeconfig .
 ## 5. Install Cilium (cluster has no CNI / networking yet at this point)
 
 ```bash
+kubectl apply -k ../cilium/
+kubectl -n kube-system wait --for=condition=complete job/cilium-install --timeout=10m
+```
+
+This runs `helm install` from an in-cluster Job instead of from your own
+machine — see [../cilium/bootstrap-job/job.yaml](../cilium/bootstrap-job/job.yaml)
+for why that's possible with no CNI up yet (`hostNetwork: true`) and what
+it needs (a cluster-admin ServiceAccount, since it's creating Cilium's
+CRDs/ClusterRoles/DaemonSets).
+
+Once it completes, remove the bootstrap RBAC — it's cluster-admin and only
+needed for this one install:
+
+```bash
+kubectl delete -f ../cilium/bootstrap-job/serviceaccount.yaml
+```
+
+If you'd rather run Helm from your own machine instead (e.g. to debug a
+failed install), the equivalent manual command is:
+
+```bash
 helm repo add cilium https://helm.cilium.io/
 helm repo update
 helm install cilium cilium/cilium --version 1.18.0 \
   --namespace kube-system -f ../cilium/values.yaml
 ```
 
-Wait for nodes to go `Ready` (`kubectl get nodes`) and `cilium status
---wait` (via the Cilium CLI, or `kubectl -n kube-system get pods -l
+Either way, wait for nodes to go `Ready` (`kubectl get nodes`) and `cilium
+status --wait` (via the Cilium CLI, or `kubectl -n kube-system get pods -l
 k8s-app=cilium`) before moving on to Agones.
 
 ## Notes
