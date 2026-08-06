@@ -18,10 +18,10 @@ Omni is applying).
 | Machine type | q35 |
 | CPU type | host |
 | Disk controller | VirtIO SCSI (not "VirtIO SCSI Single") |
-| Disk size | Control plane ≥40GB; workers ≥100GB (Minecraft world data) |
+| Disk size | Control plane ≥40GB; workers ≥200GB (Minecraft world data) |
 | Network model | virtio, on the existing bridge (DHCP) |
-| Control plane sizing | 2 vCPU / 4GB+ |
-| Worker sizing | 4 vCPU / 8GB+ (game servers are the workload) |
+| Control plane sizing | 2 vCPU / 4GB+ (`proxmox-small` via Omni) |
+| Worker sizing | 4 vCPU / 8GB+ / 200GB disk (`proxmox-medium-storage-large` via Omni) |
 
 Attach an empty install disk to each VM, then boot once from the Talos
 `metal-amd64.iso` ([Image Factory](https://factory.talos.dev/)). Talos runs

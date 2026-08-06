@@ -40,8 +40,8 @@ Aligned with [../talos/README.md](../talos/README.md) hardware guidance:
 
 | Class | Cores | Memory | Disk | Purpose |
 |---|---|---|---|---|
-| `stormcraft-control-plane` | 2 | 4 GiB | 40 GiB | etcd / API only (NoSchedule) |
-| `stormcraft-worker` | 4 | 8 GiB | 100 GiB | Agones game servers + world data |
+| `proxmox-small` | 2 | 4 GiB | 40 GiB | Control plane (etcd / API, NoSchedule) |
+| `proxmox-medium-storage-large` | 4 | 8 GiB | 200 GiB | Workers — Agones game servers + world data |
 
 Both use OVMF + q35 + `cpu_type: host`, VirtIO-friendly defaults, and tags
 `stormcraft` for Proxmox inventory. Adjust upward if you run more concurrent
@@ -63,8 +63,8 @@ docker run --rm -d --name omni-proxmox-provider \
   --omni-service-account-key "<infra-provider-key>"
 
 # 2. Register machine classes
-omnictl apply -f omni/machine-classes/control-plane.yaml
-omnictl apply -f omni/machine-classes/worker.yaml
+omnictl apply -f omni/machine-classes/proxmox-small.yaml
+omnictl apply -f omni/machine-classes/proxmox-medium-storage-large.yaml
 
 # 3. Sync the cluster (run from repo root so patch file paths resolve)
 omnictl cluster template sync -v -f omni/cluster-template.yaml

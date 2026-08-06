@@ -1,7 +1,8 @@
-# omnictl apply -f omni/machine-classes/control-plane.yaml
+# omnictl apply -f omni/machine-classes/proxmox-medium-storage-large.yaml
 #
-# Opinionated Proxmox auto-provision profile for Stormcraft control planes.
-# Sizing matches talos/README.md (2 vCPU / 4GiB+); disk 40GiB for etcd + logs.
+# Opinionated Proxmox auto-provision profile: medium compute, large storage.
+# Aimed at Agones/Minecraft workers (world data on local disk).
+# Sizing: 4 vCPU / 8 GiB / 200 GiB disk.
 #
 # Replace placeholders before apply:
 #   - storage_selector CEL (e.g. name == "local-lvm")
@@ -9,7 +10,7 @@
 metadata:
   namespace: default
   type: MachineClasses.omni.sidero.dev
-  id: stormcraft-control-plane
+  id: proxmox-medium-storage-large
 spec:
   matchlabels: []
   autoprovision:
@@ -17,10 +18,10 @@ spec:
     kernelargs: []
     metavalues: []
     providerdata: |
-      cores: 2
+      cores: 4
       sockets: 1
-      memory: 4096
-      disk_size: 40
+      memory: 8192
+      disk_size: 200
       bios: ovmf
       machine_type: q35
       cpu_type: host
@@ -33,4 +34,5 @@ spec:
       disk_aio: io_uring
       tags:
         - stormcraft
-        - control-plane
+        - worker
+        - proxmox-medium-storage-large

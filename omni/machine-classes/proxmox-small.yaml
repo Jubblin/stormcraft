@@ -1,7 +1,7 @@
-# omnictl apply -f omni/machine-classes/worker.yaml
+# omnictl apply -f omni/machine-classes/proxmox-small.yaml
 #
-# Opinionated Proxmox auto-provision profile for Stormcraft workers.
-# Sizing matches talos/README.md (4 vCPU / 8GiB+); disk 100GiB for Minecraft worlds.
+# Opinionated Proxmox auto-provision profile: small control planes.
+# Sizing: 2 vCPU / 4 GiB / 40 GiB disk (etcd / API only).
 #
 # Replace placeholders before apply:
 #   - storage_selector CEL (e.g. name == "local-lvm")
@@ -9,7 +9,7 @@
 metadata:
   namespace: default
   type: MachineClasses.omni.sidero.dev
-  id: stormcraft-worker
+  id: proxmox-small
 spec:
   matchlabels: []
   autoprovision:
@@ -17,10 +17,10 @@ spec:
     kernelargs: []
     metavalues: []
     providerdata: |
-      cores: 4
+      cores: 2
       sockets: 1
-      memory: 8192
-      disk_size: 100
+      memory: 4096
+      disk_size: 40
       bios: ovmf
       machine_type: q35
       cpu_type: host
@@ -33,4 +33,5 @@ spec:
       disk_aio: io_uring
       tags:
         - stormcraft
-        - worker
+        - control-plane
+        - proxmox-small
