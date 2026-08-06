@@ -1,5 +1,13 @@
 # Testbed
 
+Target platform is Proxmox: a Talos cluster on Proxmox VMs, Cilium as CNI
+with kube-proxy replaced, Agones hosting both Java and Bedrock Minecraft
+servers. See [talos/README.md](talos/README.md) for the cluster build and
+[cilium/values.yaml](cilium/values.yaml) for the CNI install.
+
+The Docker Desktop steps below are for quick local iteration only (e.g.
+testing an Agones/Helm change) and don't reflect the real deployment target.
+
 ## Software
 - Docker Desktop
 - talosctl to create clusters

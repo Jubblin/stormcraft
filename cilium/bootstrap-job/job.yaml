@@ -1,0 +1,65 @@
+# Applied via `kubectl apply -k cilium/` (see ../kustomization.yaml, not
+# one in this directory — Kustomize won't read ../values.yaml from here).
+#
+# Runs `helm install cilium` from inside the cluster instead of from an
+# operator's machine.
+#
+# Why hostNetwork: at this point in the bootstrap there is no CNI yet, so
+# nodes sit NotReady and normal pods can't get an IP. This Job's pod uses
+# the host's network namespace directly (the same trick kube-proxy and
+# every CNI's own DaemonSet use), which needs no CNI at all — so it can
+# schedule and run before Cilium exists to make itself un-needed.
+#
+# dnsPolicy is deliberately Default (the node's own /etc/resolv.conf), not
+# ClusterFirstWithHostNet: CoreDNS isn't up yet either, so cluster DNS
+# would just fail closed. helm.cilium.io needs to resolve via the node's
+# real upstream resolver.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cilium-install
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 1800
+  template:
+    spec:
+      serviceAccountName: cilium-installer
+      hostNetwork: true
+      dnsPolicy: Default
+      restartPolicy: Never
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoSchedule
+        - key: node.kubernetes.io/not-ready
+          operator: Exists
+          effect: NoExecute
+        - key: node.kubernetes.io/unreachable
+          operator: Exists
+          effect: NoExecute
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: cilium-install
+          image: alpine/helm:3.17.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              helm repo add cilium https://helm.cilium.io/
+              helm repo update
+              helm upgrade --install cilium cilium/cilium \
+                --version 1.18.0 \
+                --namespace kube-system \
+                -f /values/values.yaml \
+                --wait --timeout 10m
+          volumeMounts:
+            - name: values
+              mountPath: /values
+      volumes:
+        - name: values
+          configMap:
+            name: cilium-values

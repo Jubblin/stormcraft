@@ -1,0 +1,9 @@
+# Shared patch applied to BOTH controlplane.yaml and worker.yaml.
+# Cilium replaces both the default CNI and kube-proxy, so both must be
+# turned off here before the cluster ever comes up.
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true

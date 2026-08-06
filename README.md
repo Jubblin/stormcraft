@@ -1,6 +1,6 @@
 # Stormcraft
 Project:
-Create a framework to deploy and configure A Minecraft cluster for the kids.
+Create a framework to deploy and configure a Minecraft cluster for the kids.
 
 Todo list:
 - Identify Hosting requirements
