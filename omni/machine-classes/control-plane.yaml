@@ -1,0 +1,36 @@
+# omnictl apply -f omni/machine-classes/control-plane.yaml
+#
+# Opinionated Proxmox auto-provision profile for Stormcraft control planes.
+# Sizing matches talos/README.md (2 vCPU / 4GiB+); disk 40GiB for etcd + logs.
+#
+# Replace placeholders before apply:
+#   - storage_selector CEL (e.g. name == "local-lvm")
+#   - network_bridge (e.g. vmbr0)
+metadata:
+  namespace: default
+  type: MachineClasses.omni.sidero.dev
+  id: stormcraft-control-plane
+spec:
+  matchlabels: []
+  autoprovision:
+    providerid: proxmox
+    kernelargs: []
+    metavalues: []
+    providerdata: |
+      cores: 2
+      sockets: 1
+      memory: 4096
+      disk_size: 40
+      bios: ovmf
+      machine_type: q35
+      cpu_type: host
+      network_bridge: <NETWORK_BRIDGE>
+      storage_selector: name == "<STORAGE_NAME>"
+      disk_ssd: true
+      disk_discard: true
+      disk_iothread: true
+      disk_cache: none
+      disk_aio: io_uring
+      tags:
+        - stormcraft
+        - control-plane

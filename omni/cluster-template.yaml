@@ -1,0 +1,41 @@
+# omnictl cluster template sync -v -f omni/cluster-template.yaml
+#
+# Run from the repository root so relative patch paths resolve.
+# Before sync: fill VIP/IFACE in talos/patches/controlplane-vip.yaml and
+# storage/bridge placeholders in omni/machine-classes/*.yaml.
+# Pin kubernetes below to whatever your local Omni / Image Factory support.
+---
+kind: Cluster
+name: stormcraft
+labels:
+  project: stormcraft
+kubernetes:
+  version: v1.33.0
+talos:
+  version: v1.10.4
+patches:
+  - file: talos/patches/cni-kubeproxy.yaml
+  # Talos 1.13+ LifecycleService install requires an explicit install disk.
+  # VirtIO SCSI on Proxmox commonly presents as /dev/sda; change if needed.
+  - name: install-disk
+    inline:
+      machine:
+        install:
+          disk: /dev/sda
+---
+kind: ControlPlane
+machineClass:
+  name: stormcraft-control-plane
+  size: 3
+patches:
+  - file: talos/patches/controlplane-vip.yaml
+systemExtensions:
+  - siderolabs/qemu-guest-agent
+---
+kind: Workers
+name: workers
+machineClass:
+  name: stormcraft-worker
+  size: 2
+systemExtensions:
+  - siderolabs/qemu-guest-agent

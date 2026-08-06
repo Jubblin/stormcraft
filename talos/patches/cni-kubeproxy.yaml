@@ -1,9 +1,14 @@
 # Shared patch applied to BOTH controlplane.yaml and worker.yaml.
 # Cilium replaces both the default CNI and kube-proxy, so both must be
 # turned off here before the cluster ever comes up.
+#
+# forwardKubeDNSToHost is disabled because Talos enables it by default and
+# it conflicts with Cilium's BPF host routing / masquerade path (CoreDNS
+# becomes unreachable from pods). See Talos "Deploy Cilium CNI" known issues.
 cluster:
   network:
     cni:
       name: none
+    forwardKubeDNSToHost: false
   proxy:
     disabled: true

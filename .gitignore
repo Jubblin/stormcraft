@@ -1,0 +1,2 @@
+# Local Omni / Proxmox secrets — never commit
+omni/proxmox-provider/config.yaml
