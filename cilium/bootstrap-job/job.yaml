@@ -14,6 +14,16 @@
 # ClusterFirstWithHostNet: CoreDNS isn't up yet either, so cluster DNS
 # would just fail closed. helm.cilium.io needs to resolve via the node's
 # real upstream resolver.
+#
+# API access uses Talos's own kube-system/kubeconfig-in-cluster ConfigMap
+# (auto-created at bootstrap by machined's k8s.ManifestController — see
+# internal/app/machined/pkg/controllers/k8s/internal/k8stemplates/kubeconfig.go
+# in siderolabs/talos) instead of helm/kubectl's implicit in-cluster
+# auto-detection. It's a kubeconfig pointed at KubePrism
+# (https://127.0.0.1:7445), which only resolves correctly because this
+# pod is hostNetwork: true — the cert/token it references are still read
+# from this pod's own mounted ServiceAccount, so the cluster-admin
+# binding below is still required.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -46,6 +56,9 @@ spec:
         - name: cilium-install
           image: alpine/helm:3.17.1
           command: ["/bin/sh", "-c"]
+          env:
+            - name: KUBECONFIG
+              value: /etc/kubeconfig/kubeconfig
           args:
             - |
               set -eu
@@ -59,7 +72,13 @@ spec:
           volumeMounts:
             - name: values
               mountPath: /values
+            - name: kubeconfig-in-cluster
+              mountPath: /etc/kubeconfig
+              readOnly: true
       volumes:
         - name: values
           configMap:
             name: cilium-values
+        - name: kubeconfig-in-cluster
+          configMap:
+            name: kubeconfig-in-cluster
