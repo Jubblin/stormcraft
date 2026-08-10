@@ -2,6 +2,13 @@
 # Cilium replaces both the default CNI and kube-proxy, so both must be
 # turned off here before the cluster ever comes up.
 #
+# inlineManifests below is GENERATED — do not hand-edit it. It's
+# `kubectl kustomize cilium/` (cilium/bootstrap-job/*.yaml +
+# cilium/values.yaml), rendered by hack/sync-cilium-inline-manifest.py and
+# kept in sync by .github/workflows/sync-cilium-inline-manifest.yml.
+# Talos applies it automatically at bootstrap, so a fresh cluster gets the
+# cilium-install Job (see cilium/bootstrap-job/job.yaml) with no manual
+# `kubectl apply -k cilium/` step required.
 # forwardKubeDNSToHost is disabled because Talos enables it by default and
 # it conflicts with Cilium's BPF host routing / masquerade path (CoreDNS
 # becomes unreachable from pods). See Talos "Deploy Cilium CNI" known issues.
@@ -12,3 +19,182 @@ cluster:
     forwardKubeDNSToHost: false
   proxy:
     disabled: true
+  inlineManifests:
+    - name: cilium-bootstrap
+      contents: |
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: cilium-installer
+          namespace: kube-system
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: cilium-installer
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-admin
+        subjects:
+        - kind: ServiceAccount
+          name: cilium-installer
+          namespace: kube-system
+        ---
+        apiVersion: v1
+        data:
+          values.yaml: |
+            # helm install cilium cilium/cilium --version 1.18.0 --namespace kube-system -f cilium/values.yaml
+            #
+            # Talos requirements for a CNI running as the sole network provider with
+            # kube-proxy replaced (see talos/patches/cni-kubeproxy.yaml, which must be
+            # applied before this chart is installed):
+            #   - k8sServiceHost/k8sServicePort point at KubePrism (127.0.0.1:7445),
+            #     which every Talos node exposes locally so Cilium can reach the API
+            #     server without an external load balancer.
+            #   - cgroup.autoMount is disabled because Talos already mounts the unified
+            #     cgroupv2 hierarchy at /sys/fs/cgroup.
+            #   - Talos does not allow workloads to load kernel modules, so SYS_MODULE
+            #     is dropped from Cilium's default capability set.
+            ipam:
+              mode: kubernetes
+
+            kubeProxyReplacement: true
+
+            k8sServiceHost: localhost
+            k8sServicePort: 7445
+
+            cgroup:
+              autoMount:
+                enabled: false
+              hostRoot: /sys/fs/cgroup
+
+            securityContext:
+              capabilities:
+                ciliumAgent:
+                  - CHOWN
+                  - KILL
+                  - NET_ADMIN
+                  - NET_RAW
+                  - IPC_LOCK
+                  - SYS_ADMIN
+                  - SYS_RESOURCE
+                  - DAC_OVERRIDE
+                  - FOWNER
+                  - SETGID
+                  - SETUID
+                cleanCiliumState:
+                  - NET_ADMIN
+                  - SYS_ADMIN
+                  - SYS_RESOURCE
+        kind: ConfigMap
+        metadata:
+          name: cilium-values-hf922bb52h
+          namespace: kube-system
+        ---
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: cilium-install
+          namespace: kube-system
+        spec:
+          backoffLimit: 3
+          template:
+            spec:
+              containers:
+              - args:
+                - |
+                  set -eu
+                  helm repo add cilium https://helm.cilium.io/
+                  helm repo update
+                  helm upgrade --install cilium cilium/cilium \
+                    --version 1.18.0 \
+                    --namespace kube-system \
+                    -f /values/values.yaml \
+                    --wait --timeout 10m
+                command:
+                - /bin/sh
+                - -c
+                env:
+                - name: KUBECONFIG
+                  value: /etc/kubeconfig/kubeconfig
+                image: alpine/k8s:1.32.13
+                name: cilium-install
+                volumeMounts:
+                - mountPath: /values
+                  name: values
+                - mountPath: /etc/kubeconfig
+                  name: kubeconfig-in-cluster
+                  readOnly: true
+              dnsPolicy: Default
+              hostNetwork: true
+              initContainers:
+              - args:
+                - |
+                  set -eu
+
+                  echo "Checking API server is reachable..."
+                  kubectl get --raw=/healthz
+
+                  echo "Checking control-plane node count..."
+                  cp_count=$(kubectl get nodes -l node-role.kubernetes.io/control-plane -o name | wc -l)
+                  if [ "$cp_count" -ne "$EXPECTED_CONTROL_PLANE_COUNT" ]; then
+                    echo "Expected $EXPECTED_CONTROL_PLANE_COUNT control-plane nodes, found $cp_count" >&2
+                    exit 1
+                  fi
+
+                  echo "Checking kube-proxy is disabled..."
+                  if kubectl -n kube-system get daemonset kube-proxy >/dev/null 2>&1; then
+                    echo "kube-proxy DaemonSet is still present — talos/patches/cni-kubeproxy.yaml (cluster.proxy.disabled) was not applied to this cluster" >&2
+                    exit 1
+                  fi
+
+                  echo "Checking for a stuck previous cilium release..."
+                  if helm status cilium -n kube-system >/tmp/cilium-status.txt 2>/dev/null; then
+                    existing_status=$(awk '/^STATUS:/ {print $2}' /tmp/cilium-status.txt)
+                    if [ "$existing_status" != "deployed" ]; then
+                      echo "Existing cilium release is in state '$existing_status', not 'deployed' — resolve manually (e.g. helm uninstall cilium -n kube-system) before retrying" >&2
+                      exit 1
+                    fi
+                  fi
+
+                  echo "Preflight checks passed."
+                command:
+                - /bin/sh
+                - -c
+                env:
+                - name: KUBECONFIG
+                  value: /etc/kubeconfig/kubeconfig
+                - name: EXPECTED_CONTROL_PLANE_COUNT
+                  value: "3"
+                image: alpine/k8s:1.32.13
+                name: preflight
+                volumeMounts:
+                - mountPath: /etc/kubeconfig
+                  name: kubeconfig-in-cluster
+                  readOnly: true
+              nodeSelector:
+                node-role.kubernetes.io/control-plane: ""
+              restartPolicy: Never
+              serviceAccountName: cilium-installer
+              tolerations:
+              - effect: NoSchedule
+                key: node.kubernetes.io/not-ready
+                operator: Exists
+              - effect: NoExecute
+                key: node.kubernetes.io/not-ready
+                operator: Exists
+              - effect: NoExecute
+                key: node.kubernetes.io/unreachable
+                operator: Exists
+              - effect: NoSchedule
+                key: node-role.kubernetes.io/control-plane
+                operator: Exists
+              volumes:
+              - configMap:
+                  name: cilium-values-hf922bb52h
+                name: values
+              - configMap:
+                  name: kubeconfig-in-cluster
+                name: kubeconfig-in-cluster
+          ttlSecondsAfterFinished: 1800
