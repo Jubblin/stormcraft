@@ -5,6 +5,11 @@ on the existing bridge, Cilium as CNI with kube-proxy replaced. This is the
 base platform the Agones-hosted Java + Bedrock Minecraft servers will run on
 ([../README.md](../README.md)).
 
+**Preferred path:** provision and configure nodes via the local Omni instance
+and opinionated machine profiles — see [../omni/README.md](../omni/README.md).
+The `talosctl` steps below are the manual fallback (or for understanding what
+Omni is applying).
+
 ## 1. VM hardware (per node, in Proxmox)
 
 | Setting | Value |
@@ -13,15 +18,29 @@ base platform the Agones-hosted Java + Bedrock Minecraft servers will run on
 | Machine type | q35 |
 | CPU type | host |
 | Disk controller | VirtIO SCSI (not "VirtIO SCSI Single") |
+| Disk size | Control plane ≥40GB; workers ≥200GB (Minecraft world data) |
 | Network model | virtio, on the existing bridge (DHCP) |
-| Control plane sizing | 2 vCPU / 4GB+ |
-| Worker sizing | 4 vCPU / 8GB+ (game servers are the workload) |
+| Control plane sizing | 2 vCPU / 4GB+ (`proxmox-small` via Omni) |
+| Worker sizing | 4 vCPU / 8GB+ / 200GB disk (`proxmox-medium-storage-large` via Omni) |
 
-Boot each VM once from the Talos `metal-amd64.iso` (from Image Factory) with
-no disk attached yet — Talos runs from RAM in maintenance mode until it
-receives a config.
+Attach an empty install disk to each VM, then boot once from the Talos
+`metal-amd64.iso` ([Image Factory](https://factory.talos.dev/)). Talos runs
+from RAM in maintenance mode until it receives a config, then installs onto
+that disk. Without a disk attached, `apply-config` / Omni provision cannot
+complete the install.
 
-## 2. Generate machine configs
+## Checklist before config generation
+
+Fill these in before `talosctl gen config` or `omnictl cluster template sync`:
+
+1. Reserve `<VIP_IP>` in DHCP (or otherwise keep it out of the lease pool).
+2. Edit [patches/controlplane-vip.yaml](patches/controlplane-vip.yaml): set
+   `<VIP_IP>` and `<IFACE>` (usually `eth0` on Proxmox virtio — confirm with
+   `talosctl get links --insecure -n <node-ip>` after first boot).
+3. Confirm the Omni machine-class placeholders (`storage_selector`,
+   `network_bridge`) if using the Omni path — see [../omni/README.md](../omni/README.md).
+
+## 2. Generate machine configs (manual path)
 
 ```bash
 talosctl gen config stormcraft https://<VIP_IP>:6443 \
@@ -31,8 +50,8 @@ talosctl gen config stormcraft https://<VIP_IP>:6443 \
 ```
 
 `<VIP_IP>` is the floating control-plane address from
-[patches/controlplane-vip.yaml](patches/controlplane-vip.yaml) — reserve it
-in DHCP before this step, it's the cluster endpoint from here on.
+[patches/controlplane-vip.yaml](patches/controlplane-vip.yaml) — it is the
+cluster endpoint from here on.
 
 ## 3. Apply config to each node
 
@@ -54,7 +73,12 @@ talosctl bootstrap
 talosctl kubeconfig .
 ```
 
-## 5. Install Cilium (cluster has no CNI / networking yet at this point)
+## 5. Install Cilium (≈10-minute window)
+
+After bootstrap with `cni: none`, nodes stay NotReady until a CNI is running.
+Talos will appear stuck around phase 18/19 (`node not ready`) and **reboots
+to retry after roughly 10 minutes** if Cilium is not installed in time.
+Apply Cilium immediately after you have a working kubeconfig:
 
 ```bash
 kubectl apply -k ../cilium/
@@ -85,6 +109,9 @@ needed for this one install:
 kubectl delete -f ../cilium/bootstrap-job/serviceaccount.yaml
 ```
 
+(The Job itself is cleaned up by `ttlSecondsAfterFinished`; the values
+ConfigMap from kustomize can stay or be deleted with the Job leftovers.)
+
 If you'd rather run Helm from your own machine instead (e.g. to debug a
 failed install), the equivalent manual command is:
 
@@ -99,10 +126,16 @@ Either way, wait for nodes to go `Ready` (`kubectl get nodes`) and `cilium
 status --wait` (via the Cilium CLI, or `kubectl -n kube-system get pods -l
 k8s-app=cilium`) before moving on to Agones.
 
+If you miss the window and nodes reboot before Cilium is up, re-apply the
+bootstrap Job (or Helm install) as soon as the API is reachable again.
+
 ## Notes
 
 - Control-plane nodes are tainted `NoSchedule` by default in Talos, so
   game server pods land on workers without any extra config.
+- [patches/cni-kubeproxy.yaml](patches/cni-kubeproxy.yaml) sets
+  `forwardKubeDNSToHost: false` so CoreDNS works with Cilium's BPF path
+  (Talos known issue with the default `true` + Cilium masquerade/host routing).
 - Agones needs `hostPort` to work for game clients to reach a pod directly.
   Cilium supports `hostPort` natively (no extra chained CNI plugin, no
   extra Helm flag) — verify with a quick test pod before relying on it for
