@@ -24,6 +24,16 @@
 # pod is hostNetwork: true — the cert/token it references are still read
 # from this pod's own mounted ServiceAccount, so the cluster-admin
 # binding below is still required.
+#
+# The preflight initContainer checks cluster state before helm ever runs
+# (initContainers must exit 0 before the main container starts, so this
+# is a hard gate, not a warning): API reachable through the mounted
+# kubeconfig, the expected number of control-plane nodes joined, kube-proxy
+# actually absent (confirms talos/patches/cni-kubeproxy.yaml took effect —
+# if it's still running, Cilium's kube-proxy-replacement mode and
+# kube-proxy would fight over the same iptables/BPF rules), and no
+# previous cilium release stuck mid-install from a killed/failed prior run
+# (that state makes plain `helm upgrade --install` fail confusingly).
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -52,9 +62,54 @@ spec:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
+      initContainers:
+        - name: preflight
+          # alpine/k8s bundles kubectl + helm together (the kubectl version
+          # tracks the tag — pick one close to the cluster's k8s version).
+          image: alpine/k8s:1.32.13
+          command: ["/bin/sh", "-c"]
+          env:
+            - name: KUBECONFIG
+              value: /etc/kubeconfig/kubeconfig
+            - name: EXPECTED_CONTROL_PLANE_COUNT
+              value: "3"
+          args:
+            - |
+              set -eu
+
+              echo "Checking API server is reachable..."
+              kubectl get --raw=/healthz
+
+              echo "Checking control-plane node count..."
+              cp_count=$(kubectl get nodes -l node-role.kubernetes.io/control-plane -o name | wc -l)
+              if [ "$cp_count" -ne "$EXPECTED_CONTROL_PLANE_COUNT" ]; then
+                echo "Expected $EXPECTED_CONTROL_PLANE_COUNT control-plane nodes, found $cp_count" >&2
+                exit 1
+              fi
+
+              echo "Checking kube-proxy is disabled..."
+              if kubectl -n kube-system get daemonset kube-proxy >/dev/null 2>&1; then
+                echo "kube-proxy DaemonSet is still present — talos/patches/cni-kubeproxy.yaml (cluster.proxy.disabled) was not applied to this cluster" >&2
+                exit 1
+              fi
+
+              echo "Checking for a stuck previous cilium release..."
+              if helm status cilium -n kube-system >/tmp/cilium-status.txt 2>/dev/null; then
+                existing_status=$(awk '/^STATUS:/ {print $2}' /tmp/cilium-status.txt)
+                if [ "$existing_status" != "deployed" ]; then
+                  echo "Existing cilium release is in state '$existing_status', not 'deployed' — resolve manually (e.g. helm uninstall cilium -n kube-system) before retrying" >&2
+                  exit 1
+                fi
+              fi
+
+              echo "Preflight checks passed."
+          volumeMounts:
+            - name: kubeconfig-in-cluster
+              mountPath: /etc/kubeconfig
+              readOnly: true
       containers:
         - name: cilium-install
-          image: alpine/helm:3.17.1
+          image: alpine/k8s:1.32.13
           command: ["/bin/sh", "-c"]
           env:
             - name: KUBECONFIG

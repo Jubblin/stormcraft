@@ -67,6 +67,17 @@ for why that's possible with no CNI up yet (`hostNetwork: true`) and what
 it needs (a cluster-admin ServiceAccount, since it's creating Cilium's
 CRDs/ClusterRoles/DaemonSets).
 
+Before it touches Helm, a `preflight` initContainer checks the cluster is
+actually in the state this whole setup assumes — API reachable, all 3
+control-plane nodes joined, kube-proxy genuinely absent (i.e. the CNI
+patch took), and no previous cilium release stuck mid-install. It fails
+the Job with a clear message rather than let a bad assumption surface as
+a confusing Helm error. If the Job fails at this step:
+
+```bash
+kubectl -n kube-system logs job/cilium-install -c preflight
+```
+
 Once it completes, remove the bootstrap RBAC — it's cluster-admin and only
 needed for this one install:
 
