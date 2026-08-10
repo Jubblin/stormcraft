@@ -9,14 +9,10 @@
 # Talos applies it automatically at bootstrap, so a fresh cluster gets the
 # cilium-install Job (see cilium/bootstrap-job/job.yaml) with no manual
 # `kubectl apply -k cilium/` step required.
-# forwardKubeDNSToHost is disabled because Talos enables it by default and
-# it conflicts with Cilium's BPF host routing / masquerade path (CoreDNS
-# becomes unreachable from pods). See Talos "Deploy Cilium CNI" known issues.
 cluster:
   network:
     cni:
       name: none
-    forwardKubeDNSToHost: false
   proxy:
     disabled: true
   inlineManifests:
