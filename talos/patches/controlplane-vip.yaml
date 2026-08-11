@@ -11,10 +11,11 @@
 #   - Replace <IFACE> with the node's real NIC name. This isn't known until
 #     first boot — check with `talosctl get links --insecure -n <node-ip>`
 #     (usually eth0 for a Proxmox virtio NIC).
+
 machine:
   network:
     interfaces:
-      - interface: <IFACE>
+      - interface: eth0
         dhcp: true
         vip:
-          ip: <VIP_IP>
+          dhcp: true
