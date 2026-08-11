@@ -5,15 +5,19 @@
 # endpoint. Talos can float a virtual IP across the control plane nodes
 # itself, so no external load balancer is required.
 #
-# Before generating configs or syncing the Omni cluster template:
-#   1. Reserve <VIP_IP> in DHCP (or keep it out of the lease pool).
-#   2. Replace <IFACE> with the NIC name (usually eth0 on Proxmox virtio).
-#      Discover with: talosctl get links --insecure -n <node-ip>
-#   3. Replace both placeholders in this file (do not leave the angle brackets).
+# interface is set to eth0 (the Proxmox virtio NIC name — confirm for your
+# actual nodes with `talosctl get links --insecure -n <node-ip>`, or via
+# Omni's machine console if using the ../omni/README.md build path).
+#
+# vip.dhcp is set to true rather than a reserved static `vip.ip`. Talos's
+# documented VIP schema only shows a static `vip.ip` address
+# (https://docs.siderolabs.com/talos/v1.8/networking/vip) — `vip.dhcp`
+# isn't a documented field, so this may not pass `talosctl validate` /
+# config-apply. If it doesn't, fall back to `ip: <a-DHCP-reserved-address>`.
 machine:
   network:
     interfaces:
-      - interface: <IFACE>
+      - interface: eth0
         dhcp: true
         vip:
-          ip: <VIP_IP>
+          dhcp: true
