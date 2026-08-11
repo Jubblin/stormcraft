@@ -1,17 +1,19 @@
-# Controlplane-only patch (--config-patch-control-plane).
+# Controlplane-only patch (--config-patch-control-plane / Omni ControlPlane patches).
 #
 # Nodes get their real address from DHCP, but with 3 control planes the
 # cluster still needs one stable address for the Kubernetes/Talos API
 # endpoint. Talos can float a virtual IP across the control plane nodes
 # itself, so no external load balancer is required.
 #
-# Before applying:
-#   - Reserve <VIP_IP> in the DHCP server (or otherwise keep it out of the
-#     lease pool) so nothing else can claim it.
-#   - Replace <IFACE> with the node's real NIC name. This isn't known until
-#     first boot — check with `talosctl get links --insecure -n <node-ip>`
-#     (usually eth0 for a Proxmox virtio NIC).
-
+# interface is set to eth0 (the Proxmox virtio NIC name — confirm for your
+# actual nodes with `talosctl get links --insecure -n <node-ip>`, or via
+# Omni's machine console if using the ../omni/README.md build path).
+#
+# vip.dhcp is set to true rather than a reserved static `vip.ip`. Talos's
+# documented VIP schema only shows a static `vip.ip` address
+# (https://docs.siderolabs.com/talos/v1.8/networking/vip) — `vip.dhcp`
+# isn't a documented field, so this may not pass `talosctl validate` /
+# config-apply. If it doesn't, fall back to `ip: <a-DHCP-reserved-address>`.
 machine:
   network:
     interfaces:

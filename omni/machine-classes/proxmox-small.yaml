@@ -1,0 +1,37 @@
+# omnictl apply -f omni/machine-classes/proxmox-small.yaml
+#
+# Opinionated Proxmox auto-provision profile: small control planes.
+# Sizing: 2 vCPU / 4 GiB / 40 GiB disk (etcd / API only).
+#
+# Replace placeholders before apply:
+#   - storage_selector CEL (e.g. name == "local-lvm")
+#   - network_bridge (e.g. vmbr0)
+metadata:
+  namespace: default
+  type: MachineClasses.omni.sidero.dev
+  id: proxmox-small
+spec:
+  matchlabels: []
+  autoprovision:
+    providerid: proxmox
+    kernelargs: []
+    metavalues: []
+    providerdata: |
+      cores: 2
+      sockets: 1
+      memory: 4096
+      disk_size: 40
+      bios: ovmf
+      machine_type: q35
+      cpu_type: host
+      network_bridge: <NETWORK_BRIDGE>
+      storage_selector: name == "<STORAGE_NAME>"
+      disk_ssd: true
+      disk_discard: true
+      disk_iothread: true
+      disk_cache: none
+      disk_aio: io_uring
+      tags:
+        - stormcraft
+        - control-plane
+        - proxmox-small

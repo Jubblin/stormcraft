@@ -1,0 +1,10 @@
+# Copy to config.yaml (gitignored locally) and fill in real values.
+# Used by ghcr.io/siderolabs/omni-infra-provider-proxmox --config-file.
+#
+# Do not commit passwords or tokens.
+proxmox:
+  username: root
+  password: "<PROXMOX_PASSWORD>"
+  url: "https://<PROXMOX_HOST>:8006/api2/json"
+  insecureSkipVerify: true
+  realm: "pam"

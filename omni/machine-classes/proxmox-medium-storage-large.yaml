@@ -1,0 +1,38 @@
+# omnictl apply -f omni/machine-classes/proxmox-medium-storage-large.yaml
+#
+# Opinionated Proxmox auto-provision profile: medium compute, large storage.
+# Aimed at Agones/Minecraft workers (world data on local disk).
+# Sizing: 4 vCPU / 8 GiB / 200 GiB disk.
+#
+# Replace placeholders before apply:
+#   - storage_selector CEL (e.g. name == "local-lvm")
+#   - network_bridge (e.g. vmbr0)
+metadata:
+  namespace: default
+  type: MachineClasses.omni.sidero.dev
+  id: proxmox-medium-storage-large
+spec:
+  matchlabels: []
+  autoprovision:
+    providerid: proxmox
+    kernelargs: []
+    metavalues: []
+    providerdata: |
+      cores: 4
+      sockets: 1
+      memory: 8192
+      disk_size: 200
+      bios: ovmf
+      machine_type: q35
+      cpu_type: host
+      network_bridge: <NETWORK_BRIDGE>
+      storage_selector: name == "<STORAGE_NAME>"
+      disk_ssd: true
+      disk_discard: true
+      disk_iothread: true
+      disk_cache: none
+      disk_aio: io_uring
+      tags:
+        - stormcraft
+        - worker
+        - proxmox-medium-storage-large
