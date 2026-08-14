@@ -2,13 +2,12 @@
 # Cilium replaces both the default CNI and kube-proxy, so both must be
 # turned off here before the cluster ever comes up.
 #
-# inlineManifests below is GENERATED — do not hand-edit it. It's
-# `kubectl kustomize cilium/` (cilium/bootstrap-job/*.yaml +
-# cilium/values.yaml), rendered by hack/sync-cilium-inline-manifest.py and
+# inlineManifests below is GENERATED — do not hand-edit it. Each entry is
+# `kubectl kustomize <dir>/` for one of the bootstrap Jobs (cilium/,
+# flux-operator/), rendered by hack/sync-cilium-inline-manifest.py and
 # kept in sync by .github/workflows/sync-cilium-inline-manifest.yml.
-# Talos applies it automatically at bootstrap, so a fresh cluster gets the
-# cilium-install Job (see cilium/bootstrap-job/job.yaml) with no manual
-# `kubectl apply -k cilium/` step required.
+# Talos applies all of it automatically at bootstrap, so a fresh cluster
+# gets every listed Job with no manual `kubectl apply -k` step required.
 cluster:
   network:
     cni:
@@ -193,4 +192,55 @@ cluster:
               - configMap:
                   name: kubeconfig-in-cluster
                 name: kubeconfig-in-cluster
+          ttlSecondsAfterFinished: 1800
+    - name: flux-operator-bootstrap
+      contents: |
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: flux-system
+        ---
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: flux-operator-installer
+          namespace: flux-system
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: flux-operator-installer
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-admin
+        subjects:
+        - kind: ServiceAccount
+          name: flux-operator-installer
+          namespace: flux-system
+        ---
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: flux-operator-install
+          namespace: flux-system
+        spec:
+          backoffLimit: 3
+          template:
+            spec:
+              containers:
+              - args:
+                - |
+                  set -eu
+                  helm upgrade --install flux-operator \
+                    oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
+                    --namespace flux-system \
+                    --wait --timeout 10m
+                command:
+                - /bin/sh
+                - -c
+                image: alpine/k8s:1.32.13
+                name: install
+              restartPolicy: Never
+              serviceAccountName: flux-operator-installer
           ttlSecondsAfterFinished: 1800

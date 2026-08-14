@@ -1,0 +1,4 @@
+# kubectl apply -k flux-operator/
+namespace: flux-system
+resources:
+  - job.yaml
