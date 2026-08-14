@@ -13,7 +13,7 @@ on:
       - "cilium/**"
       - "flux-operator/**"
       - "talos/patches/cni-kubeproxy.yaml"
-      - "hack/sync-cilium-inline-manifest.py"
+      - "tools/sync-inline-manifests.py"
       - ".github/workflows/sync-cilium-inline-manifest.yml"
   workflow_dispatch: {}
 
@@ -37,7 +37,7 @@ jobs:
       # This is the validation step: if the script produces no diff, the
       # file was already in sync and the job ends here with nothing to do.
       - name: Regenerate talos/patches/cni-kubeproxy.yaml
-        run: python3 hack/sync-cilium-inline-manifest.py
+        run: python3 tools/sync-inline-manifests.py
 
       - name: Open a PR if it's now out of sync
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8

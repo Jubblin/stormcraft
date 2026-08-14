@@ -57,7 +57,7 @@ def render_patch() -> str:
 #
 # inlineManifests below is GENERATED — do not hand-edit it. Each entry is
 # `kubectl kustomize <dir>/` for one of the bootstrap Jobs (cilium/,
-# flux-operator/), rendered by hack/sync-cilium-inline-manifest.py and
+# flux-operator/), rendered by tools/sync-inline-manifests.py and
 # kept in sync by .github/workflows/sync-cilium-inline-manifest.yml.
 # Talos applies all of it automatically at bootstrap, so a fresh cluster
 # gets every listed Job with no manual `kubectl apply -k` step required.
