@@ -1,0 +1,53 @@
+# kubectl apply -k flux-operator/
+#
+# Runs `helm install flux-operator` from inside the cluster (same idea as
+# cilium/bootstrap-job) but without the CNI-bootstrap hacks — hostNetwork,
+# the kubeconfig-in-cluster mount, not-ready tolerations, preflight
+# checks. None of that applies here: by the time this runs, Cilium is
+# already up, so a normal pod gets normal networking and the default
+# in-cluster ServiceAccount auto-config just works.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flux-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-operator-installer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-operator-installer
+subjects:
+  - kind: ServiceAccount
+    name: flux-operator-installer
+    namespace: flux-system
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: flux-operator-install
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 1800
+  template:
+    spec:
+      serviceAccountName: flux-operator-installer
+      restartPolicy: Never
+      containers:
+        - name: install
+          image: alpine/k8s:1.32.13
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              helm upgrade --install flux-operator \
+                oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
+                --namespace flux-system \
+                --wait --timeout 10m

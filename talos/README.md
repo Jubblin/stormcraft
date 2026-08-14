@@ -129,6 +129,21 @@ k8s-app=cilium`) before moving on to Agones.
 If you miss the window and nodes reboot before Cilium is up, re-apply the
 bootstrap Job (or Helm install) as soon as the API is reachable again.
 
+## 6. Install Flux Operator
+
+Once nodes are `Ready`:
+
+```bash
+kubectl apply -k ../flux-operator/
+kubectl -n flux-system wait --for=condition=complete job/flux-operator-install --timeout=10m
+kubectl delete clusterrolebinding flux-operator-installer
+kubectl delete serviceaccount flux-operator-installer -n flux-system
+```
+
+Same in-cluster-Job idea as Cilium, without the CNI-bootstrap machinery —
+no hostNetwork, no kubeconfig-in-cluster mount, no preflight checks, none
+of that is needed once Cilium's already running normal pod networking.
+
 ## Notes
 
 - Control-plane nodes are tainted `NoSchedule` by default in Talos, so
