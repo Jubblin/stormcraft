@@ -75,6 +75,14 @@ talosctl kubeconfig .
 
 ## 5. Install Cilium (≈10-minute window)
 
+Both this Job and flux-operator's (step 6) are already in
+[patches/cni-kubeproxy.yaml](patches/cni-kubeproxy.yaml)'s
+`inlineManifests` — Talos applies them automatically right after
+`talosctl bootstrap`, so you shouldn't need to run either step's
+`kubectl apply -k` by hand. It's here for visibility into what's
+happening, and as the manual re-trigger if you miss the reboot window
+below or need to debug.
+
 After bootstrap with `cni: none`, nodes stay NotReady until a CNI is running.
 Talos will appear stuck around phase 18/19 (`node not ready`) and **reboots
 to retry after roughly 10 minutes** if Cilium is not installed in time.
@@ -131,7 +139,9 @@ bootstrap Job (or Helm install) as soon as the API is reachable again.
 
 ## 6. Install Flux Operator
 
-Once nodes are `Ready`:
+Also auto-applied via inlineManifests (see step 5) — its Job just sits
+Pending until Cilium brings nodes `Ready`, no ordering step needed. Manual
+re-trigger/debug command:
 
 ```bash
 kubectl apply -k ../flux-operator/

@@ -11,6 +11,7 @@ on:
     branches: [main]
     paths:
       - "cilium/**"
+      - "flux-operator/**"
       - "talos/patches/cni-kubeproxy.yaml"
       - "hack/sync-cilium-inline-manifest.py"
       - ".github/workflows/sync-cilium-inline-manifest.yml"
