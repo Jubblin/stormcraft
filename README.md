@@ -2,11 +2,12 @@
 
 Framework to deploy and configure a Minecraft cluster for the kids.
 
-**Build path (Proxmox):** local [Omni](omni/README.md) provisions Talos VMs via
-the Proxmox infra provider and opinionated machine profiles; Cilium replaces
-kube-proxy. Manual `talosctl` fallback lives in [talos/README.md](talos/README.md).
-Local Docker Desktop / `talosctl cluster create` notes are in
-[testbed.md](testbed.md) only (not the real target).
+**Build path (Proxmox):** all Proxmox VMs are created via local
+[Omni](omni/README.md) and the `omni-infra-provider-proxmox` provider, using
+opinionated machine profiles; Cilium replaces kube-proxy. `talosctl` steps in
+[talos/README.md](talos/README.md) are reference/fallback only, not how VMs
+are actually provisioned. Local Docker Desktop / `talosctl cluster create`
+notes are in [testbed.md](testbed.md) only (not the real target).
 
 ## Todo list
 
