@@ -1,0 +1,31 @@
+# kubectl apply -f flux-operator/instance.yaml
+#
+# Not part of flux-operator/kustomization.yaml's inlineManifests: the
+# FluxInstance CRD only exists once the operator's Helm chart (job.yaml)
+# has installed it, so this can't be applied in the same bootstrap pass.
+# Apply after `flux-operator-install` completes and the `flux-system/git`
+# secret (see talos/README.md step 7) exists.
+apiVersion: fluxcd.controlplane.io/v1
+kind: FluxInstance
+metadata:
+  name: flux
+  namespace: flux-system
+spec:
+  distribution:
+    version: "2.x"
+    registry: "ghcr.io/fluxcd"
+  components:
+    - source-controller
+    - kustomize-controller
+    - helm-controller
+    - notification-controller
+  cluster:
+    type: kubernetes
+    multitenant: false
+    networkPolicy: true
+  sync:
+    kind: GitRepository
+    url: "https://github.com/Jubblin/stormcraft.git"
+    ref: "refs/heads/main"
+    path: "clusters/stormcraft"
+    pullSecret: "git"

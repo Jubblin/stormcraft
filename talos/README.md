@@ -154,6 +154,29 @@ Same in-cluster-Job idea as Cilium, without the CNI-bootstrap machinery —
 no hostNetwork, no kubeconfig-in-cluster mount, no preflight checks, none
 of that is needed once Cilium's already running normal pod networking.
 
+## 7. Bootstrap Flux itself
+
+Step 6 only installs flux-operator — the controller that manages Flux, not
+Flux's own controllers. Point it at this repo:
+
+```bash
+kubectl create secret generic git \
+  --namespace flux-system \
+  --from-literal=username=git \
+  --from-literal=password=<GITHUB_PAT_OR_DEPLOY_KEY>
+
+kubectl apply -f ../flux-operator/instance.yaml
+kubectl -n flux-system get fluxinstance flux -w
+```
+
+This can't be an inlineManifest like steps 5/6: the `FluxInstance` CRD
+only exists once flux-operator's Helm chart has installed it, and the git
+secret needs a real credential you provide. Once the `FluxInstance`
+reports `Ready`, source-controller/kustomize-controller are running and
+reconciling [../clusters/stormcraft](../clusters/stormcraft) — that's
+where future manifests (Agones, GameServers, etc.) go instead of manual
+`kubectl apply -k`.
+
 ## Notes
 
 - Control-plane nodes are tainted `NoSchedule` by default in Talos, so
