@@ -5,10 +5,13 @@ on the existing bridge, Cilium as CNI with kube-proxy replaced. This is the
 base platform the Agones-hosted Java + Bedrock Minecraft servers will run on
 ([../README.md](../README.md)).
 
-**Preferred path:** provision and configure nodes via the local Omni instance
-and opinionated machine profiles — see [../omni/README.md](../omni/README.md).
-The `talosctl` steps below are the manual fallback (or for understanding what
-Omni is applying).
+**All Proxmox VMs are created via the local Omni instance and the
+[omni-infra-provider-proxmox](https://github.com/siderolabs/omni-infra-provider-proxmox)
+provider** — see [../omni/README.md](../omni/README.md) for the actual
+provisioning flow and opinionated machine profiles. The `talosctl` steps
+below are not used to create VMs; they're kept for understanding what Omni
+applies under the hood, and as a fallback if Omni/the provider is
+unavailable.
 
 ## 1. VM hardware (per node, in Proxmox)
 
