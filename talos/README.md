@@ -159,26 +159,43 @@ of that is needed once Cilium's already running normal pod networking.
 
 ## 7. Bootstrap Flux itself
 
-Step 6 only installs flux-operator — the controller that manages Flux, not
-Flux's own controllers. Point it at this repo:
+Auto-applied via inlineManifests too (see step 5) — `sops-decrypt-git-secret`
+and `fluxinstance-apply` (both in [../flux-operator/](../flux-operator/))
+poll until their preconditions are met, the same Pending-until-ready idea as
+step 6. The **one manual step this doesn't automate**: the `age` private key
+that decrypts the git secret has to exist on-cluster before
+`sops-decrypt-git-secret` can do anything. Create it once, per cluster:
 
 ```bash
-kubectl create secret generic git \
+kubectl create secret generic sops-age \
   --namespace flux-system \
-  --from-literal=username=git \
-  --from-literal=password=<GITHUB_PAT_OR_DEPLOY_KEY>
+  --from-file=age.agekey=<path to your age private key>
+```
 
-kubectl apply -f ../flux-operator/instance.yaml
+See [../flux-operator/git-secret.enc.yaml](../flux-operator/git-secret.enc.yaml)
+for how to generate that key and encrypt the real git PAT into the repo (the
+file currently ships as a placeholder — replace it before this works). Watch
+progress with:
+
+```bash
+kubectl -n flux-system get jobs
 kubectl -n flux-system get fluxinstance flux -w
 ```
 
-This can't be an inlineManifest like steps 5/6: the `FluxInstance` CRD
-only exists once flux-operator's Helm chart has installed it, and the git
-secret needs a real credential you provide. Once the `FluxInstance`
-reports `Ready`, source-controller/kustomize-controller are running and
-reconciling [../clusters/stormcraft](../clusters/stormcraft) — that's
-where future manifests (Agones, GameServers, etc.) go instead of manual
-`kubectl apply -k`.
+Both bootstrap Jobs fail loudly after their `activeDeadlineSeconds` if their
+precondition never shows up (age key missing, or flux-operator's Helm
+install never finishes) — check `kubectl -n flux-system describe job/<name>`
+rather than assuming a stuck cluster. Once `FluxInstance` reports `Ready`,
+source-controller/kustomize-controller are running and reconciling
+[../clusters/stormcraft](../clusters/stormcraft) — that's where future
+manifests (Agones, GameServers, etc.) go instead of manual `kubectl apply -k`.
+
+Manual re-trigger/debug (once the age-key secret and a real
+`git-secret.enc.yaml` both exist):
+
+```bash
+kubectl apply -k ../flux-operator/
+```
 
 ## Notes
 

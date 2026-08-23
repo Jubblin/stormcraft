@@ -1,10 +1,8 @@
-# kubectl apply -f flux-operator/instance.yaml
-#
-# Not part of flux-operator/kustomization.yaml's inlineManifests: the
-# FluxInstance CRD only exists once the operator's Helm chart (job.yaml)
-# has installed it, so this can't be applied in the same bootstrap pass.
-# Apply after `flux-operator-install` completes and the `flux-system/git`
-# secret (see talos/README.md step 7) exists.
+# Applied automatically by flux-operator/instance-apply-job.yaml, which
+# polls for the FluxInstance CRD (installed by job.yaml's Helm chart)
+# before applying this. Manual re-trigger/debug: kubectl apply -f
+# flux-operator/instance.yaml (once the CRD and the flux-system/git
+# secret both exist).
 apiVersion: fluxcd.controlplane.io/v1
 kind: FluxInstance
 metadata:

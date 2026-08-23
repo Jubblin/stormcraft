@@ -2,3 +2,15 @@
 namespace: flux-system
 resources:
   - job.yaml
+  - secret-decrypt-job.yaml
+  - instance-apply-job.yaml
+configMapGenerator:
+  - name: retry-until-script
+    files:
+      - retry-until.sh
+  - name: fluxinstance-manifest
+    files:
+      - instance.yaml
+  - name: git-secret-encrypted
+    files:
+      - git-secret.enc.yaml

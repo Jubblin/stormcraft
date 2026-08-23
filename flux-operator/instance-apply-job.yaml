@@ -1,0 +1,85 @@
+# Applies the FluxInstance CR (flux-operator/instance.yaml) once its CRD
+# exists — which only happens after flux-operator's own Helm install
+# (job.yaml) finishes. Polls rather than depending on Job ordering: Talos
+# applies the whole flux-operator-bootstrap inlineManifest as one batch,
+# and this Job can be scheduled before flux-operator-install completes.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluxinstance-apply
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fluxinstance-apply
+rules:
+  - apiGroups: ["fluxcd.controlplane.io"]
+    resources: ["fluxinstances"]
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluxinstance-apply-crd-check
+rules:
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fluxinstance-apply
+subjects:
+  - kind: ServiceAccount
+    name: fluxinstance-apply
+roleRef:
+  kind: Role
+  name: fluxinstance-apply
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluxinstance-apply-crd-check
+subjects:
+  - kind: ServiceAccount
+    name: fluxinstance-apply
+    namespace: flux-system
+roleRef:
+  kind: ClusterRole
+  name: fluxinstance-apply-crd-check
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fluxinstance-apply
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 1800
+  activeDeadlineSeconds: 1800
+  template:
+    spec:
+      serviceAccountName: fluxinstance-apply
+      restartPolicy: Never
+      containers:
+        - name: apply
+          image: alpine/k8s:1.32.13
+          command: ["/bin/sh", "/scripts/retry-until.sh"]
+          args:
+            - "kubectl get crd fluxinstances.fluxcd.controlplane.io >/dev/null 2>&1"
+            - "kubectl apply -f /manifest/instance.yaml"
+          volumeMounts:
+            - mountPath: /scripts
+              name: retry-until-script
+            - mountPath: /manifest
+              name: fluxinstance-manifest
+      volumes:
+        - name: retry-until-script
+          configMap:
+            name: retry-until-script
+            defaultMode: 0555
+        - name: fluxinstance-manifest
+          configMap:
+            name: fluxinstance-manifest
