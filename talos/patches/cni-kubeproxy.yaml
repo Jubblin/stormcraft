@@ -206,6 +206,91 @@ cluster:
           name: flux-operator-installer
           namespace: flux-system
         ---
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: fluxinstance-apply
+          namespace: flux-system
+        ---
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: sops-decrypt
+          namespace: flux-system
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: fluxinstance-apply
+          namespace: flux-system
+        rules:
+        - apiGroups:
+          - fluxcd.controlplane.io
+          resources:
+          - fluxinstances
+          verbs:
+          - get
+          - create
+          - update
+          - patch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: Role
+        metadata:
+          name: sops-decrypt
+          namespace: flux-system
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - get
+          - create
+          - update
+          - patch
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: fluxinstance-apply-crd-check
+        rules:
+        - apiGroups:
+          - apiextensions.k8s.io
+          resources:
+          - customresourcedefinitions
+          verbs:
+          - get
+          - list
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: fluxinstance-apply
+          namespace: flux-system
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: Role
+          name: fluxinstance-apply
+        subjects:
+        - kind: ServiceAccount
+          name: fluxinstance-apply
+          namespace: flux-system
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: RoleBinding
+        metadata:
+          name: sops-decrypt
+          namespace: flux-system
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: Role
+          name: sops-decrypt
+        subjects:
+        - kind: ServiceAccount
+          name: sops-decrypt
+          namespace: flux-system
+        ---
         apiVersion: rbac.authorization.k8s.io/v1
         kind: ClusterRoleBinding
         metadata:
@@ -217,6 +302,117 @@ cluster:
         subjects:
         - kind: ServiceAccount
           name: flux-operator-installer
+          namespace: flux-system
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: fluxinstance-apply-crd-check
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: fluxinstance-apply-crd-check
+        subjects:
+        - kind: ServiceAccount
+          name: fluxinstance-apply
+          namespace: flux-system
+        ---
+        apiVersion: v1
+        data:
+          instance.yaml: |
+            # Applied automatically by flux-operator/instance-apply-job.yaml, which
+            # polls for the FluxInstance CRD (installed by job.yaml's Helm chart)
+            # before applying this. Manual re-trigger/debug: kubectl apply -f
+            # flux-operator/instance.yaml (once the CRD and the flux-system/git
+            # secret both exist).
+            apiVersion: fluxcd.controlplane.io/v1
+            kind: FluxInstance
+            metadata:
+              name: flux
+              namespace: flux-system
+            spec:
+              distribution:
+                version: "2.x"
+                registry: "ghcr.io/fluxcd"
+              components:
+                - source-controller
+                - kustomize-controller
+                - helm-controller
+                - notification-controller
+              cluster:
+                type: kubernetes
+                multitenant: false
+                networkPolicy: true
+              sync:
+                kind: GitRepository
+                url: "https://github.com/Jubblin/stormcraft.git"
+                ref: "refs/heads/main"
+                path: "clusters/stormcraft"
+                pullSecret: "git"
+        kind: ConfigMap
+        metadata:
+          name: fluxinstance-manifest-bk52h9mkg9
+          namespace: flux-system
+        ---
+        apiVersion: v1
+        data:
+          git-secret.enc.yaml: |
+            # PLACEHOLDER — not real ciphertext. Replace before this design works.
+            #
+            # Generate your age keypair and encrypt the real secret:
+            #   container run --rm alpine:3.20 sh -c 'apk add --no-cache age >/dev/null && age-keygen' > age.agekey
+            #   # copy the "public key:" line into .sops.yaml, then:
+            #   cat <<'SECRET' > /tmp/git-secret.yaml
+            #   apiVersion: v1
+            #   kind: Secret
+            #   metadata:
+            #     name: git
+            #   type: Opaque
+            #   stringData:
+            #     username: git
+            #     password: <your GitHub PAT>
+            #   SECRET
+            #   container run --rm -v "$PWD:/work" -v /tmp/git-secret.yaml:/tmp/git-secret.yaml \
+            #     -w /work alpine:3.20 sh -c \
+            #     'apk add --no-cache sops >/dev/null && sops -e /tmp/git-secret.yaml' \
+            #     > flux-operator/git-secret.enc.yaml
+            #   rm /tmp/git-secret.yaml age.agekey  # move age.agekey to your password manager first
+            apiVersion: v1
+            kind: Secret
+            metadata:
+              name: git
+            type: Opaque
+            stringData:
+              username: REPLACE_ME
+              password: REPLACE_ME
+        kind: ConfigMap
+        metadata:
+          name: git-secret-encrypted-gf267kc7gm
+          namespace: flux-system
+        ---
+        apiVersion: v1
+        data:
+          retry-until.sh: |
+            #!/bin/sh
+            # Shared by both bootstrap Jobs (secret-decrypt-job.yaml, instance-apply-job.yaml).
+            # Polls a check command until it succeeds, then runs an action command once.
+            # Bounded by activeDeadlineSeconds on the Job itself, not by this script —
+            # Kubernetes kills the pod (Job goes Failed) if the deadline passes while
+            # this loop is still polling.
+            set -eu
+
+            CHECK="$1"
+            ACTION="$2"
+
+            until eval "$CHECK"; do
+              echo "waiting: $CHECK"
+              sleep 10
+            done
+
+            eval "$ACTION"
+        kind: ConfigMap
+        metadata:
+          name: retry-until-script-k29726k56b
           namespace: flux-system
         ---
         apiVersion: batch/v1
@@ -243,4 +439,79 @@ cluster:
                 name: install
               restartPolicy: Never
               serviceAccountName: flux-operator-installer
+          ttlSecondsAfterFinished: 1800
+        ---
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: fluxinstance-apply
+          namespace: flux-system
+        spec:
+          activeDeadlineSeconds: 1800
+          backoffLimit: 3
+          template:
+            spec:
+              containers:
+              - args:
+                - kubectl get crd fluxinstances.fluxcd.controlplane.io >/dev/null 2>&1
+                - kubectl apply -f /manifest/instance.yaml
+                command:
+                - /bin/sh
+                - /scripts/retry-until.sh
+                image: alpine/k8s:1.32.13
+                name: apply
+                volumeMounts:
+                - mountPath: /scripts
+                  name: retry-until-script
+                - mountPath: /manifest
+                  name: fluxinstance-manifest
+              restartPolicy: Never
+              serviceAccountName: fluxinstance-apply
+              volumes:
+              - configMap:
+                  defaultMode: 365
+                  name: retry-until-script-k29726k56b
+                name: retry-until-script
+              - configMap:
+                  name: fluxinstance-manifest-bk52h9mkg9
+                name: fluxinstance-manifest
+          ttlSecondsAfterFinished: 1800
+        ---
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: sops-decrypt-git-secret
+          namespace: flux-system
+        spec:
+          activeDeadlineSeconds: 900
+          backoffLimit: 3
+          template:
+            spec:
+              containers:
+              - args:
+                - |
+                  set -eu
+                  apk add --no-cache sops age >/dev/null
+                  SOPS_AGE_KEY_FILE=/age/age.agekey \
+                    sops -d /encrypted/git-secret.enc.yaml | kubectl apply -f -
+                command:
+                - /bin/sh
+                - -c
+                image: alpine/k8s:1.32.13
+                name: decrypt
+                volumeMounts:
+                - mountPath: /encrypted
+                  name: git-secret-encrypted
+                - mountPath: /age
+                  name: sops-age
+                  readOnly: true
+              restartPolicy: Never
+              serviceAccountName: sops-decrypt
+              volumes:
+              - configMap:
+                  name: git-secret-encrypted-gf267kc7gm
+                name: git-secret-encrypted
+              - name: sops-age
+                secret:
+                  secretName: sops-age
           ttlSecondsAfterFinished: 1800

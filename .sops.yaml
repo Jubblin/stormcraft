@@ -1,0 +1,10 @@
+# Encrypts flux-operator/git-secret.enc.yaml with the cluster's age keypair.
+# Generate the keypair yourself (never commit the private key):
+#   container run --rm alpine:3.20 sh -c 'apk add --no-cache age >/dev/null && age-keygen' > age.agekey
+# Then replace the placeholder public key below with the "public key:" line
+# from that output, and store age.agekey in your password manager — it's
+# the one manual secret this whole setup still needs (see
+# docs/designs/flux-auto-bootstrap.md).
+creation_rules:
+  - path_regex: flux-operator/git-secret\.enc\.yaml$
+    age: age1REPLACE_WITH_YOUR_PUBLIC_KEY
