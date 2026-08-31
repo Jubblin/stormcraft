@@ -39,7 +39,7 @@ cluster:
         apiVersion: v1
         data:
           values.yaml: |
-            # helm install cilium cilium/cilium --version 1.18.0 --namespace kube-system -f cilium/values.yaml
+            # helm install cilium cilium/cilium --version 1.20.1 --namespace kube-system -f cilium/values.yaml
             #
             # Talos requirements for a CNI running as the sole network provider with
             # kube-proxy replaced (see talos/patches/cni-kubeproxy.yaml, which must be
@@ -103,7 +103,7 @@ cluster:
                   helm repo add cilium https://helm.cilium.io/
                   helm repo update
                   helm upgrade --install cilium cilium/cilium \
-                    --version 1.18.0 \
+                    --version 1.20.1 \
                     --namespace kube-system \
                     -f /values/values.yaml \
                     --wait --timeout 10m
